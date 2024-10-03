@@ -91,12 +91,13 @@
     }
   },
   "prettier": {
-    "singleQuote": true
+    "singleQuote": true,
+    "trailingComma": "all"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
     "exclude": [
-      "**/*.spec.js"
+      ["**/*.spec.ts"]
     ]
   }
 }
