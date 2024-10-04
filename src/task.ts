@@ -1,4 +1,4 @@
-import { Category, getCategories } from './mockedApi';
+import { Category } from './mockedApi';
 
 export interface CategoryListElement {
   name: string;
@@ -9,53 +9,80 @@ export interface CategoryListElement {
   showOnHome: boolean;
 }
 
-export const categoryTree = async (): Promise<CategoryListElement[]> => {
+/**
+ * fetchData using function passed as dependency
+ * return [] if data empty
+ * start recursion over tree using loop, for each iteration:
+ *  # get category order either using Title or id
+ *  # if Title includes #, add category to list visible on home page
+ *  # run recursion on children
+ * after recursion and interation are done, sort results using order
+ */
+
+export const categoryTree = async (
+  getCategories: () => Promise<{ data: Category[] }>,
+): Promise<CategoryListElement[]> => {
   const res = await getCategories();
 
   if (!res.data) {
     return [];
   }
 
-  const toShowOnHome: number[] = [];
+  const toShowOnHome: CategoryListElement['id'][] = [];
+  const results = walkTree(res.data, toShowOnHome);
+  updateShowOnHome(results, toShowOnHome);
 
-  const getCategory = (cat: Category) => {
-    let order = cat.Title;
+  return results;
+};
+
+function walkTree(
+  cats: Category[],
+  toShowOnHome: CategoryListElement['id'][],
+): CategoryListElement[] {
+  if (cats.length === 0) return [];
+
+  const results = cats.map((cat) => {
+    const order = getCategoryOrder(cat);
+
     if (cat.Title && cat.Title.includes('#')) {
-      order = cat.Title.split('#')[0];
       toShowOnHome.push(cat.id);
-    }
-
-    let orderL = parseInt(order);
-    if (isNaN(orderL)) {
-      orderL = cat.id;
     }
 
     return {
       id: cat.id,
       image: cat.MetaTagDescription,
       name: cat.name,
-      order: orderL,
-      children: walkTree(cat.children),
+      order,
+      children: walkTree(cat.children, toShowOnHome),
       showOnHome: false,
     };
-  };
+  });
 
-  const walkTree = (cats: Category[]) => {
-    if (cats.length === 0) return [];
-    const result = cats.map((cat) => getCategory(cat));
-    result.sort((a, b) => a.order - b.order);
-    return result;
-  };
+  results.sort(
+    (a: CategoryListElement, b: CategoryListElement) => a.order - b.order,
+  );
 
-  const result = walkTree(res.data);
+  return results;
+}
 
-  if (result.length <= 5) {
-    result.forEach((a) => (a.showOnHome = true));
+function getCategoryOrder(cat: Category) {
+  const order =
+    cat.Title && cat.Title.includes('#') ? cat.Title.split('#')[0] : cat.Title;
+
+  const parsedOrder = parseInt(order);
+  return isNaN(parsedOrder) ? cat.id : parsedOrder;
+}
+
+function updateShowOnHome(
+  catetories: CategoryListElement[],
+  toShowOnHome: CategoryListElement['id'][],
+) {
+  // this will always iterate only through top-level items
+  if (catetories.length <= 5) {
+    catetories.forEach((a) => (a.showOnHome = true));
   } else if (toShowOnHome.length > 0) {
-    result.forEach((x) => (x.showOnHome = toShowOnHome.includes(x.id)));
+    catetories.forEach((x) => (x.showOnHome = toShowOnHome.includes(x.id)));
   } else {
-    result.forEach((x, index) => (x.showOnHome = index < 3));
+    catetories.forEach((x, index) => (x.showOnHome = index < 3));
   }
-
-  return result;
-};
+}
